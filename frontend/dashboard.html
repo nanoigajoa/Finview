@@ -1,16 +1,20 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
     <meta charset="UTF-8">
     <title>기업 분석 대시보드</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 </head>
+
 <body>
     <div class="container">
-        
-        <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 1px solid #334155; padding-bottom: 20px;">
-            <h1 style="margin: 0; font-size: 24px; cursor: pointer;" onclick="location.href='index.html'">📊 Quant Analyzer</h1>
+
+        <header
+            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 1px solid #334155; padding-bottom: 20px;">
+            <h1 style="margin: 0; font-size: 24px; cursor: pointer;" onclick="location.href='index.html'">📊 Quant
+                Analyzer</h1>
             <div class="search-bar">
                 <input type="text" id="searchInput" placeholder="다른 기업 검색">
                 <button id="searchBtn">검색</button>
@@ -19,20 +23,45 @@
 
         <div id="dashboard-content">
             <section class="kpi-container" id="kpiArea">
-                <div class="kpi-card"><h3>매출액</h3><p id="kpi-rev">-</p></div>
-                <div class="kpi-card"><h3>영업이익</h3><p id="kpi-op">-</p></div>
-                <div class="kpi-card"><h3>ROE</h3><p id="kpi-roe">-</p></div>
-                <div class="kpi-card"><h3>부채비율</h3><p id="kpi-debt">-</p></div>
+                <div class="kpi-card">
+                    <h3>매출액</h3>
+                    <p id="kpi-rev">-</p>
+                </div>
+                <div class="kpi-card">
+                    <h3>영업이익</h3>
+                    <p id="kpi-op">-</p>
+                </div>
+                <div class="kpi-card">
+                    <h3>ROE</h3>
+                    <p id="kpi-roe">-</p>
+                </div>
+                <div class="kpi-card">
+                    <h3>부채비율</h3>
+                    <p id="kpi-debt">-</p>
+                </div>
             </section>
 
             <div class="section-title">
-                <h2>📈 실시간 시장 지표 <span id="market-date" style="font-size:14px; color:#94a3b8; font-weight:normal;"></span></h2>
+                <h2>📈 실시간 시장 지표 <span id="market-date"
+                        style="font-size:14px; color:#94a3b8; font-weight:normal;"></span></h2>
             </div>
             <section class="kpi-container market-kpi">
-                <div class="kpi-card mini"><h3>PER</h3><p id="kpi-per">-</p></div>
-                <div class="kpi-card mini"><h3>PBR</h3><p id="kpi-pbr">-</p></div>
-                <div class="kpi-card mini"><h3>EPS</h3><p id="kpi-eps">-</p></div>
-                <div class="kpi-card mini"><h3>배당수익률(DIV)</h3><p id="kpi-div">-</p></div>
+                <div class="kpi-card mini">
+                    <h3>PER</h3>
+                    <p id="kpi-per">-</p>
+                </div>
+                <div class="kpi-card mini">
+                    <h3>PBR</h3>
+                    <p id="kpi-pbr">-</p>
+                </div>
+                <div class="kpi-card mini">
+                    <h3>EPS</h3>
+                    <p id="kpi-eps">-</p>
+                </div>
+                <div class="kpi-card mini">
+                    <h3>배당수익률(DIV)</h3>
+                    <p id="kpi-div">-</p>
+                </div>
             </section>
 
             <div class="tabs">
@@ -43,27 +72,46 @@
             </div>
 
             <main class="chart-container">
-                <div id="growth" class="tab-content active"><div id="chart-growth"></div></div>
-                <div id="profit" class="tab-content"><div id="chart-profit"></div></div>
-                <div id="stability" class="tab-content"><div id="chart-stability"></div></div>
-                <div id="cashflow" class="tab-content"><div id="chart-cashflow"></div></div>
+                <div id="growth" class="tab-content active">
+                    <div id="chart-growth"></div>
+                </div>
+                <div id="profit" class="tab-content">
+                    <div id="chart-profit"></div>
+                </div>
+                <div id="stability" class="tab-content">
+                    <div id="chart-stability"></div>
+                </div>
+                <div id="cashflow" class="tab-content">
+                    <div id="chart-cashflow"></div>
+                </div>
+                <div class="section-title" style="margin-top: 40px; display: flex; justify-content: space-between; align-items: center;">
+                    <h2>🔥 공매도 트래커 & 세력 수급</h2>
+                    <div class="time-slicer">
+                        <button class="slice-btn" onclick="renderSentiment('1W')">1주일</button>
+                        <button class="slice-btn" onclick="renderSentiment('1M')">1개월</button>
+                        <button class="slice-btn active" onclick="renderSentiment('3M')">3개월</button>
+                    </div>
+                </div>
+                <div class="sentiment-container">
+                    <div id="chart-shorting" class="sentiment-chart"></div>
+                    <div id="chart-smartmoney" class="sentiment-chart"></div>
+                </div>
+                <div
+                    style="background: var(--card-bg); padding: 25px; border-radius: 16px; border: 1px solid var(--border-color); margin-top: 30px;">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 20px;">
+                        <h3 style="margin: 0; color: #f1f5f9; font-size: 18px;">⚡ 당일 실시간 수급 동향</h3>
+                        <span id="realtime-timestamp" style="color: #94a3b8; font-size: 14px; font-weight: bold;">(데이터
+                            로딩 중...)</span>
+                    </div>
+                    <div id="chart-realtime-bar" style="height: 250px;"></div>
+                </div>
             </main>
 
-            <div class="section-title" style="margin-top: 40px; display: flex; justify-content: space-between; align-items: center;">
-                <h2>🔥 공매도 트래커 & 세력 수급</h2>
-                <div class="time-slicer">
-                    <button class="slice-btn" onclick="renderSentiment('1W')">1주일</button>
-                    <button class="slice-btn" onclick="renderSentiment('1M')">1개월</button>
-                    <button class="slice-btn active" onclick="renderSentiment('3M')">3개월</button>
-                </div>
-            </div>
-            <div class="sentiment-container">
-                <div id="chart-shorting" class="sentiment-chart"></div>
-                <div id="chart-smartmoney" class="sentiment-chart"></div>
-            </div>            
         </div>
     </div>
-    
+
     <script src="script.js"></script>
 </body>
+
 </html>

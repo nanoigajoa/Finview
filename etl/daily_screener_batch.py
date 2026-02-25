@@ -1,86 +1,109 @@
 import pandas as pd
 from pykrx import stock
+import FinanceDataReader as fdr  # 🌟 신규 장착된 메타데이터 전용 API
 from datetime import datetime, timedelta
 import sqlite3
 import os
 import time
 
+def get_safe_business_day():
+    today = datetime.today()
+    if today.hour < 18:
+        today -= timedelta(days=1)
+        
+    print("✅ 자체 검증 달력 엔진 가동: KRX 실제 영업일 탐색 중...")
+    
+    # 1. 최근 진짜 영업일 탐색
+    while True:
+        if today.weekday() <= 4:
+            target_date = today.strftime("%Y%m%d")
+            if not stock.get_market_cap(target_date, market="KOSPI").empty:
+                break
+        today -= timedelta(days=1)
+        
+    # 2. 1개월 전 진짜 영업일 탐색
+    month_ago = today - timedelta(days=30)
+    while True:
+        if month_ago.weekday() <= 4:
+            month_date = month_ago.strftime("%Y%m%d")
+            if not stock.get_market_cap(month_date, market="KOSPI").empty:
+                break
+        month_ago -= timedelta(days=1)
+        
+    return target_date, month_date
+
 def run_daily_batch():
-    print("🚀 T-0 멀티팩터 스크리너 배치 파이프라인 가동을 시작합니다...")
+    print("🚀 T-0 멀티팩터 스크리너 배치 파이프라인 (100% API Edition) 가동...")
     start_time = time.time()
 
-    # 1. 날짜 설정 (가장 최근 영업일 탐색)
-    today = datetime.today()
-    # 주말 보정 (토요일->금요일, 일요일->금요일)
-    if today.weekday() == 5: today -= timedelta(days=1)
-    elif today.weekday() == 6: today -= timedelta(days=2)
-    target_date = today.strftime("%Y%m%d")
-    
-    # 수급 누적용 1달 전 날짜
-    one_month_ago = (today - timedelta(days=30)).strftime("%Y%m%d")
+    target_date, one_month_ago = get_safe_business_day()
     print(f"✅ 기준일: {target_date} / 수급 집계: {one_month_ago} ~ {target_date}")
 
-    # 2. 시장별 펀더멘털 및 시가총액 일괄 조회 (KOSPI, KOSDAQ)
-    print("✅ 데이터 수집 중: 전 종목 펀더멘털 및 시가총액 (API 타격 최소화)...")
-    
-    df_fund_kospi = stock.get_market_fundamental(target_date, market="KOSPI")
-    df_fund_kospi['market_type'] = 'KOSPI'
-    df_fund_kosdaq = stock.get_market_fundamental(target_date, market="KOSDAQ")
-    df_fund_kosdaq['market_type'] = 'KOSDAQ'
-    df_fund = pd.concat([df_fund_kospi, df_fund_kosdaq])
+    # 🌟 [리팩토링 완료] 지저분한 웹 크롤링을 버리고, FDR API 한 줄로 우아하게 해결
+    print("✅ 데이터 수집 중: FinanceDataReader API를 통한 표준 업종 추출...")
+# 🌟 [리팩토링 완료] 지저분한 웹 크롤링을 버리고, FDR API 한 줄로 우아하게 해결
+    print("✅ 데이터 수집 중: FinanceDataReader API를 통한 표준 업종 추출...")
+    try:
+        # 'KRX-DESC'를 호출해야 'Sector'(업종) 데이터가 포함된 명부를 줍니다.
+        df_master_fdr = fdr.StockListing('KRX-DESC')
+        
+        # 라이브러리 버전에 따라 종목코드 컬럼명이 'Code' 또는 'Symbol'일 수 있으므로 방어 로직 추가
+        code_col = 'Code' if 'Code' in df_master_fdr.columns else 'Symbol'
+        
+        # Sector(업종) 데이터가 비어있는 종목(ETF, 스팩 등)은 제외하여 데이터 오염 방지
+        df_master_fdr = df_master_fdr.dropna(subset=['Sector'])
+        
+        # 종목코드와 산업군(Sector)을 딕셔너리로 완벽 매핑
+        sector_map = dict(zip(df_master_fdr[code_col], df_master_fdr['Sector']))
+        print(f"   -> 총 {len(sector_map)}개 상장사의 표준 업종 API 매핑 성공!")
+    except Exception as e:
+        print(f"   -> 업종 API 호출 실패: {e}")
+        sector_map = {}
+        
+    print("✅ 시가총액 데이터 수집 중...")
+    df_cap = pd.concat([stock.get_market_cap(target_date, market="KOSPI"), stock.get_market_cap(target_date, market="KOSDAQ")])
+    df_cap.index = df_cap.index.astype(str) 
 
-    df_cap_kospi = stock.get_market_cap(target_date, market="KOSPI")
-    df_cap_kosdaq = stock.get_market_cap(target_date, market="KOSDAQ")
-    df_cap = pd.concat([df_cap_kospi, df_cap_kosdaq])
+    print("✅ 펀더멘털 데이터 수집 중...")
+    df_fund = pd.concat([stock.get_market_fundamental(target_date, market="KOSPI"), stock.get_market_fundamental(target_date, market="KOSDAQ")])
+    df_fund.index = df_fund.index.astype(str)
 
-    # 3. 1개월 기관 누적 순매수 일괄 조회 (단일 호출로 시장 전체 조회)
-    print("✅ 데이터 수집 중: 최근 1개월 기관 합계 누적 수급...")
-    df_inst_kospi = stock.get_market_net_purchases_of_equities_by_ticker(one_month_ago, target_date, market="KOSPI", investor="기관합계")
-    df_inst_kosdaq = stock.get_market_net_purchases_of_equities_by_ticker(one_month_ago, target_date, market="KOSDAQ", investor="기관합계")
-    df_inst = pd.concat([df_inst_kospi, df_inst_kosdaq])
+    print("✅ 기관 수급 데이터 수집 중...")
+    df_inst = pd.concat([
+        stock.get_market_net_purchases_of_equities_by_ticker(one_month_ago, target_date, market="KOSPI", investor="기관합계"),
+        stock.get_market_net_purchases_of_equities_by_ticker(one_month_ago, target_date, market="KOSDAQ", investor="기관합계")
+    ])
+    df_inst.index = df_inst.index.astype(str)
 
-    # 4. 데이터프레임 병합 (Join)
-    print("✅ 데이터 병합 및 Z-Score 1단계(Median) 계산 중...")
-    df_master = df_fund.join(df_cap[['시가총액']], how='left')
+    print("✅ 데이터 병합(Join) 및 진짜 산업별 통계 연산 중...")
+    df_master = df_cap[['시가총액']].join(df_fund[['PER', 'PBR', 'EPS', 'DIV']], how='left')
     df_master = df_master.join(df_inst[['순매수거래대금']], how='left').fillna(0)
     
-    # ROE 파생 변수 생성 (PBR / PER)
     df_master['ROE'] = df_master.apply(lambda x: (x['PBR'] / x['PER'] * 100) if x['PER'] > 0 else 0.0, axis=1)
+    df_master = df_master.reset_index().rename(columns={'티커': 'stock_code', 'index': 'stock_code'})
 
-    # 5. 시장(섹터 대용)별 Median 계산 및 병합
-    median_df = df_master.groupby('market_type')[['PER', 'PBR', 'ROE']].median().reset_index()
-    median_df.rename(columns={'PER':'median_per', 'PBR':'median_pbr', 'ROE':'median_roe'}, inplace=True)
-    
-    df_master = df_master.reset_index() # 인덱스에 있던 티커를 컬럼으로 올림
-    df_master.rename(columns={'티커': 'stock_code', 'index': 'stock_code'}, inplace=True)
-    df_master = pd.merge(df_master, median_df, on='market_type', how='left')
-
-    # 종목명 매핑
+    # 🌟 완벽한 산업 섹터 주입
+    df_master['sector_name'] = df_master['stock_code'].map(sector_map).fillna('분류안됨')
     df_master['corp_name'] = df_master['stock_code'].apply(lambda x: stock.get_market_ticker_name(x))
 
-    # 최종 테이블 컬럼 정리
-    final_cols = [
-        'stock_code', 'corp_name', 'market_type', 
-        'PER', 'PBR', 'ROE', 'EPS', 'DIV', 
-        '시가총액', '순매수거래대금', 
-        'median_per', 'median_pbr', 'median_roe'
-    ]
+    # 🌟 산업별 진짜 중간값(Median) 정밀 타격
+    valid_fund = df_master[df_master['PER'] > 0]
+    median_df = valid_fund.groupby('sector_name')[['PER', 'PBR', 'ROE']].median().reset_index()
+    median_df.rename(columns={'PER':'median_per', 'PBR':'median_pbr', 'ROE':'median_roe'}, inplace=True)
+    
+    df_master = pd.merge(df_master, median_df, on='sector_name', how='left').fillna(0)
+
+    final_cols = ['stock_code', 'corp_name', 'sector_name', 'PER', 'PBR', 'ROE', 'EPS', 'DIV', '시가총액', '순매수거래대금', 'median_per', 'median_pbr', 'median_roe']
     df_final = df_master[final_cols].copy()
 
-    # 6. 데이터베이스 저장 (Materialized View 역할)
-    print("✅ 데이터베이스(SQLite)에 요약 마트 테이블 적재 중...")
     db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "finance.db")
-    
-    # 경로가 없으면 생성
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
-    
     conn = sqlite3.connect(db_path)
-    # 기존 테이블을 완전히 덮어쓰기 (매일매일 가장 최신 스냅샷만 유지)
     df_final.to_sql('screener_summary', conn, if_exists='replace', index=False)
     conn.close()
 
     elapsed = round(time.time() - start_time, 2)
-    print(f"🎉 배치 완료! 총 2,500여 개 종목 데이터가 성공적으로 적재되었습니다. (소요시간: {elapsed}초)")
+    print(f"🎉 배치 완료! 크롤링 없는 100% 순수 API 파이프라인 구축 성공 (소요시간: {elapsed}초)")
 
 if __name__ == "__main__":
     run_daily_batch()

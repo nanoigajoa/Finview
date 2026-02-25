@@ -4,70 +4,26 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>퀀트 펀더멘털 분석 플랫폼</title>
+    <title>퀀트 펀더멘털 포털</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body style="display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; flex-direction: column;">
     
-    <div style="text-align: center; width: 100%; max-width: 800px;">
-        <h1 style="font-size: 3.5rem; margin-bottom: 20px; color: #ffffff; text-shadow: 0 0 20px rgba(59, 130, 246, 0.6);">
+    <div style="text-align: center; width: 100%; max-width: 600px;">
+        <h1 style="font-size: 3.5rem; margin-bottom: 40px; color: #ffffff; text-shadow: 0 0 20px rgba(59, 130, 246, 0.6);">
             📊 Quant Analyzer
         </h1>
         
-        <div class="mode-toggle">
-            <button id="mode-search" class="toggle-btn active">🔍 종목 검색</button>
-            <button id="mode-screener" class="toggle-btn">🎯 퀀트 스크리너</button>
-        </div>
-
-        <div id="section-search" class="search-bar" style="transform: scale(1.2); justify-content: center; margin-top: 40px;">
-            <input type="text" id="searchInput" placeholder="기업명 또는 종목코드 (예: SOOP, 067160)">
+        <div class="search-bar" style="transform: scale(1.2); justify-content: center; margin-bottom: 30px;">
+            <input type="text" id="searchInput" placeholder="기업명 또는 종목코드 (예: 삼성전자)">
             <button id="searchBtn">분석 시작</button>
         </div>
 
-        <div id="section-screener" style="display: none; margin-top: 30px; text-align: left; background: var(--card-bg); padding: 30px; border-radius: 16px; border: 1px solid var(--border-color);">
-            <div class="filter-grid">
-                <div class="filter-item">
-                    <label>최소 ROE (%)</label>
-                    <input type="number" id="filter-roe" placeholder="예: 15">
-                </div>
-                <div class="filter-item">
-                    <label>최대 PER (배)</label>
-                    <input type="number" id="filter-per" placeholder="예: 10">
-                </div>
-                <div class="filter-item">
-                    <label>최대 PBR (배)</label>
-                    <input type="number" id="filter-pbr" placeholder="예: 1.5">
-                </div>
-                <div class="filter-item">
-                    <label>최소 시가총액 (억원)</label>
-                    <input type="number" id="filter-cap" placeholder="예: 5000">
-                </div>
-            </div>
-            <div style="margin-top: 20px; display: flex; justify-content: space-between; align-items: center;">
-                <label style="color: #f1f5f9; font-size: 16px; cursor: pointer;">
-                    <input type="checkbox" id="filter-inst" style="transform: scale(1.5); margin-right: 10px;"> 최근 1개월 기관 순매수 종목만 보기
-                </label>
-                <button id="runScreenerBtn" style="padding: 12px 24px; font-size: 16px; border-radius: 8px; background: var(--accent-color); color: white; border: none; cursor: pointer; font-weight: bold;">조건 발굴 🚀</button>
-            </div>
-
-            <div id="screener-results" style="margin-top: 30px; display: none;">
-                <h3 style="color: #94a3b8; margin-bottom: 10px;">검색 결과: <span id="result-count" style="color: #fff;">0</span>건</h3>
-                <div style="max-height: 300px; overflow-y: auto; border-radius: 8px; border: 1px solid var(--border-color);">
-                    <table style="width: 100%; border-collapse: collapse; color: #f1f5f9; text-align: center;">
-                        <thead style="background: #1e293b; position: sticky; top: 0;">
-                            <tr>
-                                <th style="padding: 10px; border-bottom: 1px solid #334155;">종목명</th>
-                                <th style="padding: 10px; border-bottom: 1px solid #334155;">PER</th>
-                                <th style="padding: 10px; border-bottom: 1px solid #334155;">PBR</th>
-                                <th style="padding: 10px; border-bottom: 1px solid #334155;">ROE</th>
-                                <th style="padding: 10px; border-bottom: 1px solid #334155;">섹터 평균(PER)</th>
-                            </tr>
-                        </thead>
-                        <tbody id="result-tbody">
-                            </tbody>
-                    </table>
-                </div>
-            </div>
+        <div style="margin-top: 40px;">
+            <p style="color: #94a3b8; margin-bottom: 15px;">조건에 맞는 저평가 우량주를 찾고 싶다면?</p>
+            <button onclick="location.href='screener.html'" style="padding: 15px 30px; font-size: 18px; border-radius: 30px; background: transparent; color: var(--primary-color); border: 2px solid var(--primary-color); cursor: pointer; font-weight: bold; transition: 0.3s;" onmouseover="this.style.background='rgba(59, 130, 246, 0.1)'" onmouseout="this.style.background='transparent'">
+                🎯 퀀트 스크리너 입장하기
+            </button>
         </div>
     </div>
 

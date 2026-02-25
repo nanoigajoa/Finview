@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>멀티팩터 스크리너</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container" style="max-width: 1000px; padding-top: 50px;">
+        
+        <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; border-bottom: 1px solid #334155; padding-bottom: 20px;">
+            <h1 style="margin: 0; font-size: 28px; cursor: pointer;" onclick="location.href='index.html'">📊 Quant Analyzer <span style="font-size: 20px; color: #94a3b8;">| Screener</span></h1>
+        </header>
+
+        <div style="background: var(--card-bg); padding: 30px; border-radius: 16px; border: 1px solid var(--border-color);">
+            <div class="filter-grid">
+                <div class="filter-item">
+                    <label for="filter-roe">최소 ROE (%)</label>
+                    <input type="number" id="filter-roe" placeholder="예: 15">
+                </div>
+                <div class="filter-item">
+                    <label for="filter-per">최대 PER (배)</label>
+                    <input type="number" id="filter-per" placeholder="예: 10">
+                </div>
+                <div class="filter-item">
+                    <label for="filter-pbr">최대 PBR (배)</label>
+                    <input type="number" id="filter-pbr" placeholder="예: 1.5">
+                </div>
+                <div class="filter-item">
+                    <label for="filter-cap">최소 시가총액 (억원)</label>
+                    <input type="number" id="filter-cap" placeholder="예: 5000">
+                </div>
+            </div>
+            
+            <div style="margin-top: 30px; display: flex; justify-content: space-between; align-items: center;">
+                <label for="filter-inst" style="color: #f1f5f9; font-size: 16px; cursor: pointer; display: flex; align-items: center;">
+                    <input type="checkbox" id="filter-inst" style="width: 20px; height: 20px; margin-right: 10px; cursor: pointer;"> 
+                    최근 1개월 기관 누적 순매수 종목만 보기
+                </label>
+                <button id="runScreenerBtn" style="padding: 14px 28px; font-size: 16px; border-radius: 8px; background: var(--accent-color); color: white; border: none; cursor: pointer; font-weight: bold;">조건 발굴 🚀</button>
+            </div>
+        </div>
+
+        <div id="screener-results" style="margin-top: 40px; display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 15px;">
+                <h3 style="color: #94a3b8; margin: 0;">검색 결과: <span id="result-count" style="color: #fff;">0</span>건</h3>
+                <input type="text" id="quickFilter" placeholder="결과 내 종목명 검색..." style="padding: 8px 15px; border-radius: 20px; border: 1px solid #334155; background: #0f172a; color: #fff;">
+            </div>
+            <div style="max-height: 500px; overflow-y: auto; border-radius: 8px; border: 1px solid var(--border-color);">
+                <table style="width: 100%; border-collapse: collapse; color: #f1f5f9; text-align: center; background: var(--card-bg);">
+                    <thead style="background: #1e293b; position: sticky; top: 0; user-select: none;">
+                        <tr>
+                            <th style="padding: 15px; border-bottom: 1px solid #334155; cursor: pointer;" onclick="window.sortTable('corp_name')">종목명 ↕️</th>
+                            <th style="padding: 15px; border-bottom: 1px solid #334155; cursor: pointer;" onclick="window.sortTable('sector_name')">섹터 ↕️</th>
+                            <th style="padding: 15px; border-bottom: 1px solid #334155; cursor: pointer;" onclick="window.sortTable('PER')">PER ↕️</th>
+                            <th style="padding: 15px; border-bottom: 1px solid #334155; cursor: pointer;" onclick="window.sortTable('PBR')">PBR ↕️</th>
+                            <th style="padding: 15px; border-bottom: 1px solid #334155; cursor: pointer;" onclick="window.sortTable('ROE')">ROE ↕️</th>
+                            <th style="padding: 15px; border-bottom: 1px solid #334155; cursor: pointer;" onclick="window.sortTable('median_per')">산업 평균(PER) ↕️</th>
+                        </tr>
+                    </thead>
+                    <tbody id="result-tbody">
+                        </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
