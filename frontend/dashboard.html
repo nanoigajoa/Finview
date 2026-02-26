@@ -22,6 +22,19 @@
         </header>
 
         <div id="dashboard-content">
+                <div style="background: linear-gradient(135deg, #1e293b, #0f172a); padding: 25px; border-radius: 12px; border: 1px solid #3b82f6; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+        <div>
+            <h4 style="color: #94a3b8; margin: 0 0 8px 0; font-size: 14px;">🎯 AI 산출 기계적 적정 주가</h4>
+            <div style="display: flex; align-items: baseline; gap: 15px;">
+                <span id="target-price" style="font-size: 32px; font-weight: bold; color: #fff;">분석 중... ⚡</span>
+                <span id="upside-percent" style="font-size: 18px; font-weight: bold; padding: 6px 12px; border-radius: 8px; display: none;"></span>
+            </div>
+        </div>
+        <div style="text-align: right; color: #64748b; font-size: 13px; line-height: 1.5;">
+            ※ (최근 4분기 합산 EPS) × (섹터 가중평균 PER)<br>
+            네이버/토스증권과 동일한 업종 분류 기준
+        </div>
+    </div>
             <section class="kpi-container" id="kpiArea">
                 <div class="kpi-card">
                     <h3>매출액</h3>
