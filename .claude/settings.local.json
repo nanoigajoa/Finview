@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"import aiofiles\")",
+      "Bash(pip install:*)",
+      "Bash(python -c \":*)",
+      "Bash(xargs ls:*)",
+      "Bash(python3:*)",
+      "Bash(python -c \"from pykrx import stock; help\\(stock.get_market_trading_volume_by_date\\)\")",
+      "Bash(python -c \"from pykrx import stock; df = stock.get_market_trading_volume_by_date\\(''20260310'', ''20260320'', ''005930''\\); print\\(''Columns:'', df.columns.tolist\\(\\)\\); print\\(''\\\\nFirst row:\\\\n'', df.iloc[0] if not df.empty else ''Empty''\\)\")",
+      "Bash(sqlite3 data/finance.db \".schema api_cache\")",
+      "Bash(python -c \"import pykrx; print\\(pykrx.__file__\\)\")",
+      "Read(//c/Users/user/AppData/Local/Programs/Python/Python312/Lib/site-packages/pykrx/**)",
+      "Bash(C:/Users/user/AppData/Local/Programs/Python/Python312/python.exe -c \":*)",
+      "Bash(xargs grep:*)",
+      "Bash(C:/Users/user/AppData/Local/Programs/Python/Python312/python.exe -m pip install html5lib -q)",
+      "Bash(python -m py_compile backend/main.py)",
+      "Bash(python -m py_compile etl/daily_market_batch.py)"
+    ]
+  }
+}

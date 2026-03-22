@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float
+from sqlalchemy import Column, Integer, String, Float, UniqueConstraint
 from sqlalchemy.orm import declarative_base
 from sqlalchemy import create_engine
 
@@ -8,6 +8,8 @@ class FinancialReport(Base):
     """재무 리포트 팩트 테이블 (순이익, 현금흐름 방 추가 완료)"""
     __tablename__ = 'financial_reports'
     
+    __table_args__ = (UniqueConstraint('corp_code', 'year', name='uq_corp_year'),)
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     corp_name = Column(String(50), nullable=False)
     corp_code = Column(String(8), nullable=False)

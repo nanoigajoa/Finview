@@ -18,7 +18,7 @@
             <h3 style="color: #f1f5f9; margin-top: 0; margin-bottom: 20px;">1. 가치 및 규모 필터</h3>
             <div class="filter-grid">
                 <div class="filter-item">
-                    <label for="filter-roe">최소 ROE (%)</label>
+                    <label for="filter-roe">최소 ROE, % (DART 실적 기준)</label>
                     <input type="number" id="filter-roe" placeholder="예: 15">
                 </div>
                 <div class="filter-item">
@@ -51,7 +51,7 @@
                 </div>
                 <div class="filter-item">
                     <label for="filter-peg" style="color: #f59e0b; font-weight: bold;">최대 PEG (배) 🔥</label>
-                    <input type="number" step="0.1" id="filter-peg" placeholder="예: 1.0 (고성장 저평가)">
+                    <input type="number" step="0.1" id="filter-peg" placeholder="예: 1.0 (PER ÷ 순이익CAGR)">
                 </div>
             </div>
             
@@ -63,7 +63,7 @@
                     </label>
                     <label for="filter-ocf" style="color: #f1f5f9; font-size: 15px; cursor: pointer; display: flex; align-items: center;">
                         <input type="checkbox" id="filter-ocf" style="width: 18px; height: 18px; margin-right: 10px; cursor: pointer;"> 
-                        최근 3년 연속 순이익 흑자 기업만 보기 (OCF Proxy)
+                        최근 3년 연속 영업현금흐름 플러스 기업만 보기
                     </label>
                 </div>
                 <button id="runScreenerBtn" style="padding: 14px 35px; font-size: 18px; border-radius: 8px; background: var(--accent-color); color: white; border: none; cursor: pointer; font-weight: bold;">조건 발굴 🚀</button>
@@ -107,8 +107,8 @@
                             <th style="padding: 15px; border-bottom: 1px solid #334155; cursor: pointer;" onclick="window.sortTable('sector_name')">섹터 ↕️</th>
                             <th style="padding: 15px; border-bottom: 1px solid #334155; cursor: pointer;" onclick="window.sortTable('PER')">PER ↕️</th>
                             <th style="padding: 15px; border-bottom: 1px solid #334155; cursor: pointer;" onclick="window.sortTable('PBR')">PBR ↕️</th>
-                            <th style="padding: 15px; border-bottom: 1px solid #334155; cursor: pointer;" onclick="window.sortTable('median_pbr')">업종평균(PBR) ↕️</th>
-                            <th style="padding: 15px; border-bottom: 1px solid #334155; cursor: pointer;" onclick="window.sortTable('ROE')">ROE ↕️</th>
+                            <th style="padding: 15px; border-bottom: 1px solid #334155; cursor: pointer;" onclick="window.sortTable('sector_pbr')">섹터벤치마크(PBR) ↕️</th>
+                            <th style="padding: 15px; border-bottom: 1px solid #334155; cursor: pointer;" onclick="window.sortTable('ROE')">ROE(실적) ↕️</th>
                             <th style="padding: 15px; border-bottom: 1px solid #334155; cursor: pointer;" onclick="window.sortTable('rev_cagr_3y')">매출CAGR ↕️</th>
                             <th style="padding: 15px; border-bottom: 1px solid #334155; cursor: pointer;" onclick="window.sortTable('op_cagr_3y')">영익CAGR ↕️</th>
                             <th style="padding: 15px; border-bottom: 1px solid #334155; cursor: pointer;" onclick="window.sortTable('debt_ratio')">부채비율 ↕️</th>

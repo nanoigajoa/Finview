@@ -6,6 +6,9 @@ import sqlite3
 import os
 import time
 import requests
+from dotenv import load_dotenv
+
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config", ".env"))
 
 def get_safe_business_day():
     today = datetime.today()
@@ -14,15 +17,21 @@ def get_safe_business_day():
     while True:
         if today.weekday() <= 4:
             target_date = today.strftime("%Y%m%d")
-            if not stock.get_market_cap(target_date, market="KOSPI").empty:
-                break
+            try:
+                if len(stock.get_market_ticker_list(target_date, market="KOSPI")) > 0:
+                    break
+            except Exception:
+                pass
         today -= timedelta(days=1)
     month_ago = today - timedelta(days=30)
     while True:
         if month_ago.weekday() <= 4:
             month_date = month_ago.strftime("%Y%m%d")
-            if not stock.get_market_cap(month_date, market="KOSPI").empty:
-                break
+            try:
+                if len(stock.get_market_ticker_list(month_date, market="KOSPI")) > 0:
+                    break
+            except Exception:
+                pass
         month_ago -= timedelta(days=1)
     return target_date, month_date
 
@@ -61,7 +70,7 @@ def run_daily_batch():
         df_master_code = pd.read_sql("SELECT stock_code, corp_code FROM company_master", conn_master)
         conn_master.close()
         
-        api_key = "1009054bb1fab7f3a54a1dcbd71bd57e678b3ab8"
+        api_key = os.getenv("DART_API_KEY", "")
         corp_codes = df_master_code['corp_code'].dropna().tolist()
         
         years = ['2021', '2022', '2023', '2024']
@@ -95,30 +104,50 @@ def run_daily_batch():
                             if 'liab' not in fin_data[code][year] or item.get("fs_div") == "CFS": fin_data[code][year]['liab'] = amt
                         elif acct == "자본총계":
                             if 'eq' not in fin_data[code][year] or item.get("fs_div") == "CFS": fin_data[code][year]['eq'] = amt
+                        elif acct in ["영업활동현금흐름", "영업활동으로 인한 현금흐름"]:
+                            if 'ocf' not in fin_data[code][year] or item.get("fs_div") == "CFS": fin_data[code][year]['ocf'] = amt
+                        elif acct in ["유형자산의 취득", "유형자산취득"]:
+                            # CAPEX는 현금유출(음수)이므로 abs()로 양수화
+                            if 'capex' not in fin_data[code][year] or item.get("fs_div") == "CFS": fin_data[code][year]['capex'] = abs(amt)
 
         quality_list = []
         for idx, row in df_master_code.iterrows():
             code = row['corp_code']
             stock_code = row['stock_code']
             fd = fin_data.get(code, {})
-            
+
             r21, r24 = fd.get('2021', {}).get('rev', 0), fd.get('2024', {}).get('rev', 0)
             o21, o24 = fd.get('2021', {}).get('op', 0), fd.get('2024', {}).get('op', 0)
-            
+            ni21, ni24 = fd.get('2021', {}).get('ni', 0), fd.get('2024', {}).get('ni', 0)
+
             rev_cagr = (((r24 / r21) ** (1/3)) - 1) * 100 if r21 > 0 and r24 > 0 else 0.0
             op_cagr = (((o24 / o21) ** (1/3)) - 1) * 100 if o21 > 0 and o24 > 0 else 0.0
-            
-            ni22, ni23, ni24 = fd.get('2022', {}).get('ni', 0), fd.get('2023', {}).get('ni', 0), fd.get('2024', {}).get('ni', 0)
-            ocf_pass = 1 if (ni22 > 0 and ni23 > 0 and ni24 > 0) else 0
-            
+            # P2: EPS CAGR = 순이익 CAGR (주식 수 안정 가정) — PEG 표준 분모
+            eps_cagr = (((ni24 / ni21) ** (1/3)) - 1) * 100 if ni21 > 0 and ni24 > 0 else 0.0
+
+            # P0: ocf_pass = 실제 영업활동현금흐름 3개년 연속 플러스 (순이익 기준 아님)
+            ocf22 = fd.get('2022', {}).get('ocf', 0)
+            ocf23 = fd.get('2023', {}).get('ocf', 0)
+            ocf24 = fd.get('2024', {}).get('ocf', 0)
+            ocf_pass = 1 if (ocf22 > 0 and ocf23 > 0 and ocf24 > 0) else 0
+
             l24, e24 = fd.get('2024', {}).get('liab', 0), fd.get('2024', {}).get('eq', 0)
             debt_ratio = (l24 / e24) * 100 if e24 > 0 else 0.0
             dart_roe = (ni24 / e24) * 100 if e24 > 0 else 0.0
-            
+
+            # P2: FCF = OCF - CAPEX (직접 계산), CAPEX 없으면 OCF의 80% 보수적 추정
+            capex24 = fd.get('2024', {}).get('capex', 0)
+            if ocf24 > 0:
+                fcf24 = round((ocf24 - capex24) / 100000000 if capex24 > 0 else ocf24 * 0.8 / 100000000, 2)
+            else:
+                fcf24 = 0.0
+
             quality_list.append({
                 'stock_code': stock_code, 'revenue': r24,
                 'rev_cagr_3y': round(rev_cagr, 2), 'op_cagr_3y': round(op_cagr, 2),
-                'ocf_pass': ocf_pass, 'debt_ratio': round(debt_ratio, 2), 'dart_roe': round(dart_roe, 2)
+                'eps_cagr_3y': round(eps_cagr, 2),
+                'ocf_pass': ocf_pass, 'debt_ratio': round(debt_ratio, 2),
+                'dart_roe': round(dart_roe, 2), 'fcf': fcf24
             })
             
         df_quality = pd.DataFrame(quality_list)
@@ -135,7 +164,7 @@ def run_daily_batch():
     if not df_quality.empty:
         df_master = df_master.join(df_quality, how='left')
     else:
-        for col in ['revenue', 'rev_cagr_3y', 'op_cagr_3y', 'ocf_pass', 'debt_ratio', 'dart_roe']:
+        for col in ['revenue', 'rev_cagr_3y', 'op_cagr_3y', 'eps_cagr_3y', 'ocf_pass', 'debt_ratio', 'dart_roe', 'fcf']:
             df_master[col] = 0.0
             
     df_master = df_master.fillna(0).reset_index().rename(columns={'티커': 'stock_code', 'index': 'stock_code'})
@@ -143,7 +172,10 @@ def run_daily_batch():
     df_master['sector_name'] = df_master['stock_code'].map(sector_map).fillna('분류안됨')
     df_master['corp_name'] = df_master['stock_code'].apply(lambda x: stock.get_market_ticker_name(x))
     
-    df_master['ROE'] = df_master.apply(lambda x: (x['PBR'] / x['PER'] * 100) if x['PER'] > 0 else x['dart_roe'], axis=1)
+    # P1: ROE 출처 분리 — market_roe(시장 역산)와 dart_roe(DART 실적) 명시적 분리
+    # ROE(스크리너 기준) = dart_roe 우선(실제 장부), 없으면 market_roe(시장 추정) 폴백
+    df_master['market_roe'] = df_master.apply(lambda x: round((x['PBR'] / x['PER'] * 100), 2) if x['PER'] > 0 else 0.0, axis=1)
+    df_master['ROE'] = df_master.apply(lambda x: x['dart_roe'] if x.get('dart_roe', 0) != 0 else x['market_roe'], axis=1)
     df_master['PSR'] = df_master.apply(lambda x: (x['시가총액'] / x['revenue']) if x['revenue'] > 0 else 0.0, axis=1)
     # 🌟 추가: 각 기업 데이터의 완전성 플래그 (PER, PBR, 매출 모두 >0일 때 완전)
     df_master['is_complete'] = ((df_master['PER'] > 0) & (df_master['PBR'] > 0) & (df_master['revenue'] > 0)).astype(int)
@@ -162,30 +194,33 @@ def run_daily_batch():
     sector_sums = valid_fund.groupby('sector_name')[['시가총액', 'implied_ni', 'implied_eq', 'revenue']].sum()
     
     # 3단계: 합산된 덩어리 데이터로 '진짜 업종 지표'를 도출합니다.
+    # P1: 컬럼명 sector_* 로 통일 — median_* 는 실제 중앙값이 아닌 시총 가중평균이라 오해 소지
     sector_metrics = pd.DataFrame()
-    sector_metrics['median_per'] = sector_sums['시가총액'] / sector_sums['implied_ni']
-    sector_metrics['median_pbr'] = sector_sums['시가총액'] / sector_sums['implied_eq']
-    
+    sector_metrics['sector_per'] = sector_sums['시가총액'] / sector_sums['implied_ni']
+    sector_metrics['sector_pbr'] = sector_sums['시가총액'] / sector_sums['implied_eq']
+
     # PSR은 합산 매출액이 0보다 클 때만 계산 (ZeroDivision 방어)
-    sector_metrics['median_psr'] = sector_sums.apply(
+    sector_metrics['sector_psr'] = sector_sums.apply(
         lambda x: x['시가총액'] / x['revenue'] if x['revenue'] > 0 else 0, axis=1
     )
-    
+
     # 업종 ROE = (업종 총 순이익 / 업종 총 자본) * 100
-    sector_metrics['median_roe'] = (sector_sums['implied_ni'] / sector_sums['implied_eq']) * 100
-    
-    # 매출 CAGR은 기업별 규모 편차가 크므로 시가총액 가중보다는 '섹터 중간값(Median)'을 쓰는 것이 성장성 판단에 유리합니다.
-    sector_metrics['median_rev_cagr'] = valid_fund.groupby('sector_name')['rev_cagr_3y'].median()
+    sector_metrics['sector_roe'] = (sector_sums['implied_ni'] / sector_sums['implied_eq']) * 100
+
+    # 매출 CAGR은 규모 편차가 크므로 실제 섹터 중앙값(Median) 사용
+    sector_metrics['sector_rev_cagr'] = valid_fund.groupby('sector_name')['rev_cagr_3y'].median()
     
     sector_metrics = sector_metrics.reset_index()
     
     # 4단계: 기존 마스터 데이터에 네이버증권 방식의 지표를 병합합니다.
     df_master = pd.merge(df_master, sector_metrics, on='sector_name', how='left').fillna(0)
     
-    # 🌟 최종 저장 컬럼에 'median_rev_cagr' 완벽 추가
-    final_cols = ['stock_code', 'corp_name', 'sector_name', 'PER', 'PBR', 'PSR', 'ROE', 'EPS', 'DIV', 
-                  '시가총액', '순매수거래대금', 'median_per', 'median_pbr', 'median_psr', 'median_roe', 'median_rev_cagr',
-                  'rev_cagr_3y', 'op_cagr_3y', 'ocf_pass', 'debt_ratio', 'is_complete']
+    # 최종 저장 컬럼 (sector_* = 시총 가중평균 벤치마크, dart_roe = DART 실적 기준)
+    final_cols = ['stock_code', 'corp_name', 'sector_name', 'PER', 'PBR', 'PSR', 'ROE', 'EPS', 'DIV',
+                  '시가총액', '순매수거래대금',
+                  'market_roe', 'dart_roe',
+                  'sector_per', 'sector_pbr', 'sector_psr', 'sector_roe', 'sector_rev_cagr',
+                  'rev_cagr_3y', 'op_cagr_3y', 'eps_cagr_3y', 'ocf_pass', 'debt_ratio', 'fcf', 'is_complete']
     df_final = df_master[final_cols].copy()
 
     os.makedirs(os.path.dirname(db_path), exist_ok=True)

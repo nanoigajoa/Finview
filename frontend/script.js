@@ -1,28 +1,144 @@
-// 글로벌 상태 변수 (수급 데이터를 쥐고 있는 역할)
+// 글로벌 상태 변수
 let sentimentRawData = [];
+let quarterlyCurrentYear = new Date().getFullYear() - 1;  // 기본값: 전년도 (예: 2025 → 2024)
+window.currentQuery = null;
+
+// API base: 같은 서버에서 서빙되면 상대경로, 파일로 직접 열면 localhost 폴백
+const API_BASE = window.location.protocol === 'file:' ? 'http://127.0.0.1:8000' : '';
 
 // 🌟 [버그 픽스] 차트 탭 전환 시 Plotly 강제 리사이즈 (공매도 차트 먹통 해결)
 function openTab(tabName) {
     const tabContents = document.getElementsByClassName("tab-content");
     for (let i = 0; i < tabContents.length; i++) tabContents[i].classList.remove("active");
-    
+
     const tabBtns = document.getElementsByClassName("tab-btn");
     for (let i = 0; i < tabBtns.length; i++) tabBtns[i].classList.remove("active");
-    
+
     const targetTab = document.getElementById(tabName);
     if(targetTab) {
         targetTab.classList.add("active");
-        
-        // 🌟 핵심: 탭이 열리는 순간, 그 안에 숨어있던 모든 Plotly 차트에게 "너의 진짜 크기로 다시 그려라"라고 명령합니다.
         const charts = targetTab.querySelectorAll('.js-plotly-plot');
         charts.forEach(chart => Plotly.relayout(chart, {autosize: true}));
     }
-    
+
     if(event && event.currentTarget) event.currentTarget.classList.add("active");
+
+    // 분기 탭 열릴 때 데이터 로드
+    if (tabName === 'quarterly' && window.currentQuery) {
+        fetchQuarterlyData(window.currentQuery, quarterlyCurrentYear);
+    }
+}
+
+// ── 분기 차트 ──────────────────────────────────────────────────────────────
+async function fetchQuarterlyData(query, year) {
+    const revEl  = document.getElementById('chart-quarterly-rev');
+    const opEl   = document.getElementById('chart-quarterly-op');
+    if (!revEl || !opEl) return;
+    revEl.innerHTML = '<div style="padding:40px;color:#94a3b8;text-align:center;">불러오는 중...</div>';
+    opEl.innerHTML = '';
+    try {
+        const res = await fetch(`${API_BASE}/api/quarterly/${encodeURIComponent(query)}/${year}`);
+        if (!res.ok) throw new Error('quarterly API 오류');
+        const data = await res.json();
+        renderQuarterlyChart(data);
+    } catch (e) {
+        revEl.innerHTML = `<div style="padding:40px;color:#ef4444;text-align:center;">분기 데이터 로드 실패: ${e.message}</div>`;
+    }
+}
+
+function renderQuarterlyChart(data) {
+    const revEl = document.getElementById('chart-quarterly-rev');
+    const opEl  = document.getElementById('chart-quarterly-op');
+    if (!revEl || !opEl || !data.quarters) return;
+
+    const { h1, q3, q4, annual } = data.quarters;
+    const labels = ['상반기(H1)', 'Q3', 'Q4', '연간합계'];
+    const commonLayout = (title) => ({
+        title: { text: title, font: { color: '#f1f5f9', size: 16 } },
+        barmode: 'group',
+        paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
+        xaxis: { tickfont: { color: '#94a3b8' }, gridcolor: '#334155' },
+        yaxis: { title: '억원', tickfont: { color: '#94a3b8' }, gridcolor: '#334155' },
+        margin: { t: 50, b: 40, l: 60, r: 20 },
+        legend: { font: { color: '#f1f5f9' } },
+        hoverlabel: { bgcolor: '#1e293b', font: { color: '#f1f5f9' } }
+    });
+
+    const revVals = [h1.revenue, q3.revenue, q4.revenue, annual.revenue];
+    const opVals  = [h1.op_income, q3.op_income, q4.op_income, annual.op_income];
+
+    const barColors = ['#3b82f6', '#8b5cf6', '#f59e0b', '#10b981'];
+
+    const makeTrace = (vals, name) => ({
+        x: labels, y: vals, name,
+        type: 'bar',
+        marker: { color: barColors },
+        hovertemplate: '%{x}: %{y:,.1f}억<extra></extra>',
+        text: vals.map(v => v !== 0 ? v.toFixed(0) : ''),
+        textposition: 'outside',
+        textfont: { color: '#94a3b8', size: 11 }
+    });
+
+    Plotly.newPlot(revEl, [makeTrace(revVals, '매출액')],
+        commonLayout(`${data.corp_name} ${data.year}년 분기별 매출액`),
+        { responsive: true, displayModeBar: false });
+
+    Plotly.newPlot(opEl, [makeTrace(opVals, '영업이익')],
+        commonLayout(`${data.corp_name} ${data.year}년 분기별 영업이익`),
+        { responsive: true, displayModeBar: false });
+}
+
+function initQuarterlyYearButtons(query) {
+    const container = document.getElementById('quarterly-year-btns');
+    if (!container) return;
+    const currentYear = new Date().getFullYear();
+    const years = [currentYear - 1, currentYear - 2, currentYear - 3, currentYear - 4];
+    quarterlyCurrentYear = years[0];
+    container.innerHTML = '';
+    years.forEach((yr, idx) => {
+        const btn = document.createElement('button');
+        btn.innerText = yr + '년';
+        btn.style.cssText = `padding:6px 14px; border-radius:6px; border:1px solid #334155; cursor:pointer; font-size:13px;
+            background:${idx === 0 ? '#3b82f6' : '#1e293b'}; color:${idx === 0 ? '#fff' : '#94a3b8'};`;
+        btn.dataset.year = yr;
+        btn.onclick = () => {
+            document.querySelectorAll('#quarterly-year-btns button').forEach(b => {
+                b.style.background = '#1e293b'; b.style.color = '#94a3b8';
+            });
+            btn.style.background = '#3b82f6'; btn.style.color = '#fff';
+            quarterlyCurrentYear = yr;
+            fetchQuarterlyData(query, yr);
+        };
+        container.appendChild(btn);
+    });
 }
 
 const formatNum = (num) => new Intl.NumberFormat('ko-KR').format(Math.round(num));
 const formatRatio = (num) => num.toFixed(1) + "%";
+
+// 데이터 소스 배지 렌더링
+function renderSourceBadge(type, sourceInfo) {
+    const el = document.getElementById(`badge-${type}`);
+    if (!el || !sourceInfo) return;
+    const bar = document.getElementById('data-sources-bar');
+    if (bar) bar.style.display = 'flex';
+    const status = sourceInfo.status || 'missing';
+    const from = sourceInfo.from || '';
+    const note = sourceInfo.note || '';
+    const colors = { ok: '#10b981', partial: '#f59e0b', missing: '#ef4444' };
+    const icons  = { ok: '✓', partial: '⚠', missing: '✗' };
+    const fromLabels = {
+        dart_realtime: 'DART', realtime: '실시간', screener_quality: '집계캐시',
+        cache: '캐시', none: '없음',
+        trading_value: 'KRX', trading_volume: 'KRX', naver_frgn: '네이버',
+    };
+    const color = colors[status] || '#94a3b8';
+    const icon  = icons[status]  || '?';
+    const fromLabel = fromLabels[from] || from;
+    const labels = { finance: '재무', market: '시장', sentiment: '수급' };
+    const title = note ? ` title="${note}"` : '';
+    el.innerHTML = `${labels[type] || type}: <span style="color:${color};font-weight:bold;"${title}>${icon} ${fromLabel}</span>`;
+}
 
 // --- [공통] 재무 차트 렌더링 엔진 ---
 function drawChart(elementId, xData, datasets, title, yAxisTitle, isRatio = false) {
@@ -110,10 +226,9 @@ function renderSentiment(period) {
     // 최신 데이터로 실시간 바 차트도 독립적으로 렌더링합니다 (차트가 없어도 전체 기능 중단 안됨)
     const latestData = sliced[sliced.length - 1];
     if (latestData) {
-        const now = new Date();
-        const timeString = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
         const tsEl = document.getElementById('realtime-timestamp');
-        if(tsEl) tsEl.innerText = `(기준: ${latestData.date} ${timeString})`;
+        // P1: 전일 종가 기준 데이터 — 브라우저 현재 시각 혼용 제거
+        if(tsEl) tsEl.innerText = `(기준: ${latestData.date} 종가 기준)`;
 
         const retVal = latestData.retail_buy || 0;
         const instVal = latestData.inst_buy || 0;
@@ -156,6 +271,8 @@ async function fetchAndRenderData(query) {
     btn.style.opacity = "0.7";
 
     window.history.replaceState({}, '', `dashboard.html?query=${encodeURIComponent(query)}`);
+    window.currentQuery = query;
+    initQuarterlyYearButtons(query);
 
     // 상태 플래그
     window.metaStatuses = {finance:false, market:false, sentiment:false};
@@ -188,13 +305,15 @@ async function fetchAndRenderData(query) {
     const timeout = (ms) => new Promise((_, reject) => setTimeout(() => reject(new Error("시간 초과")), ms));
 
     try {
-        const pFinance = fetch(`http://127.0.0.1:8000/api/finance/${query}`).then(r => r.json());
-        const pMarket = Promise.race([fetch(`http://127.0.0.1:8000/api/market/${query}`).then(r => r.json()), timeout(5000)]);
-        const pSentiment = Promise.race([fetch(`http://127.0.0.1:8000/api/sentiment/${query}`).then(r => r.json()), timeout(5000)]);
+        const pFinance = Promise.race([fetch(`${API_BASE}/api/finance/${query}`).then(r => r.json()), timeout(30000)]);
+        const pMarket = Promise.race([fetch(`${API_BASE}/api/market/${query}`).then(r => r.json()), timeout(15000)]);
+        const pSentiment = Promise.race([fetch(`${API_BASE}/api/sentiment/${query}`).then(r => r.json()), timeout(15000)]);
 
         pFinance.then(result => {
             const data = result.data;
-            if(result.meta && result.meta.missing && result.meta.missing.length){
+            const finSrc = result.meta?.sources?.finance;
+            renderSourceBadge('finance', finSrc);
+            if (finSrc && finSrc.status !== 'ok') {
                 window.metaStatuses.finance = true;
             }
             showDataWarning();
@@ -222,47 +341,71 @@ async function fetchAndRenderData(query) {
             drawChart("chart-profit", years, [{ y: roe, name: "ROE", color: "#10b981" }, { y: opMargin, name: "영업이익률", color: "#3b82f6" }], `${result.corp_name} 수익률 추이`, "비율 (%)", true);
             drawChart("chart-stability", years, [{ y: debt, name: "부채비율", color: "#ef4444" }], `${result.corp_name} 재무 건전성 추이`, "비율 (%)", true);
             drawChart("chart-cashflow", years, [{ y: opCash, name: "영업활동현금흐름", color: "#3b82f6" }, { y: fcf, name: "잉여현금흐름(FCF)", color: "#f59e0b" }], `${result.corp_name} 현금 창출 능력`, "단위 (억원)");
-        }).catch(e => {console.error("재무 데이터 오류", e);
+        }).catch(e => {
+            console.error("재무 데이터 오류", e);
             window.metaStatuses.finance = true;
+            renderSourceBadge('finance', {status: 'missing', from: 'none', note: e.message});
             showDataWarning();
         });
 
         pMarket.then(marketResult => {
             const md = (marketResult && marketResult.data) ? marketResult.data : {};
-            if(!marketResult || !marketResult.meta || marketResult.meta.present === false) {
+            const mktSrc = marketResult?.meta?.sources?.market;
+            renderSourceBadge('market', mktSrc);
+            if (!mktSrc || mktSrc.status === 'missing') {
                 window.metaStatuses.market = true;
             }
             showDataWarning();
             let dateStr = marketResult && marketResult.date ? `(${marketResult.date} 종가 기준)` : '';
-            if(marketResult.meta && marketResult.meta.fallback) {
+            if(marketResult?.meta?.fallback || mktSrc?.from === 'cache') {
                 dateStr += ' [← 배치데이터]';
             }
             document.getElementById("market-date").innerText = dateStr;
             document.getElementById("kpi-per").innerText = md.PER > 0 ? md.PER.toFixed(2) + "배" : "N/A";
             document.getElementById("kpi-pbr").innerText = md.PBR > 0 ? md.PBR.toFixed(2) + "배" : "N/A";
-            document.getElementById("kpi-eps").innerText = formatNum(md.EPS) + "원";
+            // EPS: 적자 기업 표시
+            document.getElementById("kpi-eps").innerText = md.EPS_negative ? "적자" : (formatNum(md.EPS) + "원");
             document.getElementById("kpi-div").innerText = md.DIV > 0 ? md.DIV.toFixed(2) + "%" : "배당없음";
 
-            // 🌟 신규: 적정 주가 및 업사이드(+%) 렌더링 엔진
+            // TTM PER: 연간 PER 대비 색상 (TTM PER < 연간 PER → 이익 증가 신호 → 초록)
+            const ttmPerEl = document.getElementById("kpi-ttm-per");
+            if (ttmPerEl) {
+                if (md.ttm_per > 0) {
+                    ttmPerEl.innerText = md.ttm_per.toFixed(2) + "배";
+                    ttmPerEl.style.color = (md.PER > 0 && md.ttm_per < md.PER) ? "#10b981" : "#ef4444";
+                } else {
+                    ttmPerEl.innerText = "N/A";
+                    ttmPerEl.style.color = "";
+                }
+            }
+
+            // Graham Number
+            const grahamEl = document.getElementById("kpi-graham");
+            if (grahamEl)
+                grahamEl.innerText = md.graham > 0 ? formatNum(md.graham) + "원" : "N/A";
+
+            // 적정 주가 및 업사이드(+%) 렌더링
             const targetEl = document.getElementById("target-price");
             const upsideEl = document.getElementById("upside-percent");
-            
+
             if (targetEl && upsideEl) {
-                // 적자 기업(EPS가 0 이하)이거나 밸류에이션이 불가능한 경우 방어
                 if (md.target_price > 0 && md.current_price > 0) {
                     targetEl.innerText = formatNum(md.target_price) + "원";
                     targetEl.style.color = "#ffffff";
-                    
+                    // tooltip: TTM EPS 기반 여부 명시
+                    targetEl.title = md.ttm_available
+                        ? `TTM EPS(${formatNum(md.ttm_eps)}원) × 섹터PER`
+                        : `연간 EPS(${formatNum(md.EPS)}원) × 섹터PER`;
+
                     const upside = md.upside;
                     const color = upside > 0 ? "#10b981" : (upside < 0 ? "#ef4444" : "#94a3b8");
                     const sign = upside > 0 ? "+" : "";
-                    
                     upsideEl.style.backgroundColor = `${color}20`;
                     upsideEl.style.color = color;
                     upsideEl.innerText = `${sign}${upside.toFixed(1)}% 기대`;
                     upsideEl.style.display = "inline-block";
                 } else {
-                    targetEl.innerText = "분석 불가 (적자 기업)";
+                    targetEl.innerText = md.EPS_negative ? "분석 불가 (적자 기업)" : "분석 불가";
                     targetEl.style.color = "#ef4444";
                     upsideEl.style.display = "none";
                 }
@@ -276,14 +419,19 @@ async function fetchAndRenderData(query) {
         pSentiment.then(sentimentResult => {
             sentimentRawData = sentimentResult.data || [];
             console.log("[sentiment] received", sentimentRawData.length, "records");
-            if(sentimentResult.meta && sentimentResult.meta.count === 0) {
+            const sentSrc = sentimentResult?.meta?.sources?.sentiment;
+            renderSourceBadge('sentiment', sentSrc);
+            if (!sentSrc || sentSrc.status === 'missing') {
                 window.metaStatuses.sentiment = true;
+            } else if (sentSrc.status === 'partial') {
+                // partial은 경고 배너 대신 배지로만 표시
             }
             showDataWarning();
             renderSentiment('3M');
         }).catch(e => {
             console.error("수급 데이터 수집 지연/오류", e);
             window.metaStatuses.sentiment = true;
+            renderSourceBadge('sentiment', {status: 'missing', from: 'none', note: e.message});
             showDataWarning();
             // 차트 영역을 모두 초기화하여 오류 화면을 사용자에게 알림
             ['chart-shorting','chart-smartmoney','chart-realtime-bar'].forEach(id=>{
@@ -437,9 +585,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 <td style="font-weight: bold; color: #3b82f6; padding: 15px; vertical-align: middle;">${item.corp_name}</td>
                 <td style="color: #cbd5e1; font-size: 13px; padding: 15px; vertical-align: middle;">${item.sector_name}</td>
                 
-                <td style="padding: 10px 15px; vertical-align: middle;">${createMiniBar(item.PER, item.median_per)}</td>
-                <td style="padding: 10px 15px; vertical-align: middle;">${createMiniBar(item.PBR, item.median_pbr)}</td>
-                <td style="padding: 10px 15px; vertical-align: middle;">${createMiniBar(item.PSR, item.median_psr)}</td>
+                <td style="padding: 10px 15px; vertical-align: middle;">${createMiniBar(item.PER, item.sector_per)}</td>
+                <td style="padding: 10px 15px; vertical-align: middle;">${createMiniBar(item.PBR, item.sector_pbr)}</td>
+                <td style="padding: 10px 15px; vertical-align: middle;">${createMiniBar(item.PSR, item.sector_psr)}</td>
                 
                 <td style="color: #f59e0b; font-weight: bold; text-align: center; vertical-align: middle; font-size: 15px;">${item.ROE.toFixed(1)}%</td>
                 <td style="color: ${item.rev_cagr_3y > 10 ? '#10b981' : '#f1f5f9'}; text-align: center; vertical-align: middle; font-size: 15px;">${item.rev_cagr_3y.toFixed(1)}%</td>
@@ -505,7 +653,7 @@ document.addEventListener("DOMContentLoaded", () => {
             };
 
             try {
-                const res = await fetch("http://127.0.0.1:8000/api/screener", {
+                const res = await fetch(`${API_BASE}/api/screener`, {
                     method: "POST", 
                     headers: { "Content-Type": "application/json" }, 
                     body: JSON.stringify(reqBody)
