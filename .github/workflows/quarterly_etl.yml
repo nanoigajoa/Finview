@@ -9,7 +9,9 @@ on:
 jobs:
   quarterly-dart-update:
     runs-on: ubuntu-latest
-    timeout-minutes: 60  # DART 벌크 수집 최대 60분 허용
+    timeout-minutes: 60
+    permissions:
+      contents: write  # DART 벌크 수집 최대 60분 허용
 
     steps:
       - name: 1. 코드 체크아웃

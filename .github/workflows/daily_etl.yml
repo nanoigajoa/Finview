@@ -8,6 +8,8 @@ on:
 jobs:
   daily-market-update:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: 1. 코드 체크아웃
