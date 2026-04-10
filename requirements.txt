@@ -5,3 +5,5 @@ numpy
 sqlalchemy
 streamlit
 plotly
+pykrx
+FinanceDataReader
