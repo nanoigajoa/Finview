@@ -6,4 +6,4 @@ sqlalchemy
 streamlit
 plotly
 pykrx
-FinanceDataReader
+finance-datareader
